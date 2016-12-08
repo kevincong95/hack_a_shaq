@@ -1,0 +1,37 @@
+---
+title: "Hacking Targets"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+Load the hack log, and get the number of times each playerID shows up. The all_players.csv maps playerIDs to names.
+
+```{r}
+hacks <- read.csv("hack_master.csv")
+hackedPlayers <- table(hacks$HackedPlayerID)
+hackedIDs <- names(hackedPlayers) #IDs of players targeted
+```
+
+Repeat for how often teams hack or get hacked.
+
+```{r}
+hackers <- table(hacks$Team) #who likes to hack?
+hackees <- table(hacks$Opp) #which teams get hacked?
+```
+
+Clean up the player directory. Keep only those players who were on a roster during the 2015-16 season. Then sort by lowest FT rate, provided that this FT rate is lower than 70% (otherwise expected value of 2 free throws is greater than 1 point)
+```{r}
+allPlayers <- read.csv("all_players.csv")
+allPlayers <- allPlayers[allPlayers$ROSTERSTATUS == 1,]
+allPlayers <- allPlayers[order(allPlayers$FT_RATE15),]
+vulnerable <- allPlayers[allPlayers$FT_RATE15 > 0,]
+vulnerable <- vulnerable[vulnerable$FT_RATE15 < 0.7,]
+```
+
+Players who have been targeted at least 10 times over the last 3 require our attention. "targets" should be an array of length 12.
+
+```{r}
+targets <- hackedPlayers[which(hackedPlayers >= 10)]
+```
+
