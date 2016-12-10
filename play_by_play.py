@@ -9,7 +9,9 @@ from collections import OrderedDict
 import play_utils as utils
 import pdb
 
-#list of headers for play-by-play data
+'''
+List of headers for play-by-play data.
+'''
 params = {1:'GAME_ID', 2:'EVENTNUM', 3:'EVENTMSGTYPE', 4:'EVENTMSGACTIONTYPE', 5:'PERIOD', 6:'WCTIMESTRING', 
 7:'PCTIMESTRING', 8:'HOMEDESCRIPTION', 9:'NEUTRALDESCRIPTION', 10:'VISITORDESCRIPTION', 11:'SCORE', 12:'SCOREMARGIN',
 13:'PERSON1TYPE', 14:'PLAYER1_ID', 15:'PLAYER1_NAME', 16:'PLAYER1_TEAM_ID', 17:'PLAYER1_TEAM_CITY',
@@ -17,10 +19,17 @@ params = {1:'GAME_ID', 2:'EVENTNUM', 3:'EVENTMSGTYPE', 4:'EVENTMSGACTIONTYPE', 5
 23:'PLAYER2_TEAM_ID', 24:'PLAYER2_TEAM_CITY', 25:'PLAYER2_TEAM_NICKNAME', 26:'PLAYER2_TEAM_ABBREVIATION', 
 27:'PERSON3TYPE', 28:'PLAYER3_ID', 29:'PLAYER3_NAME', 30:'PLAYER3_TEAM_ID', 31:'PLAYER3_TEAM_CITY', 32:'PLAYER3_TEAM_NICKNAME',
 33:'PLAYER3_TEAM_ABBREVIATION'}
+
+'''
+See db_README.md.
+'''
 hack_keys = ['GameID', 'Season', 'Date', 'Playoffs', 'Team', 'Opp', 'Coach', 'Location', 'HackedPlayerID', 'HackedFTRate',
             'StartQ', 'StartTime', 'StartMargin', 'PlayerRemoved', 'PlayerRestTime', 'EndQ', 'EndTime', 'EndMargin',
             'NumPoss', 'FTM', 'FTA', 'ReturnMargin', '2ndChancePts', 'Win']
-#Yes NBA.com, I am a user agent
+
+'''
+Yes NBA.com, I am a user agent.
+'''
 userHeaders = {
     'User-Agent': 'MMozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36',
     'From': 'dr.boar@gmail.com'
@@ -28,9 +37,9 @@ userHeaders = {
 
 '''
 Saves a game's play-by-play log in dataframe format.
-@param season: n corresponds to the (2000+n)-(2001+n) NBA season.
+@param season: If season = n, we check stats from the [2000 + n] - [2001 + n] season.
 @param num: See below for game number format used by NBA.com.
-@param playoffs: Whether or not we are looking for a playoff game.
+@param playoffs: If true, the game is a playoff game. By default, the game is a regular season game.
 '''
 def playByPlay(season, num, playoffs = False):
     game = gameID(season, num, playoffs)
@@ -53,12 +62,14 @@ def playByPlay(season, num, playoffs = False):
 
 '''
 Return an NBA.com game ID.
+@param season: If season = n, we check stats from the [2000 + n] - [2001 + n] season.
 @param num: Regular season: 1 <= num <= 1230
 Playoffs: A 3-digit number XYZ.
 X corresponds to the round number; 1 for conference quarterfinals, 4 for NBA finals.
 Y corresponds to the series number.
 Z corresponds to the game number; 1 <= Z <= 7.
-@param playoffs: 
+@param playoffs: If true, the game is a playoff game.
+@return: A 10-digit number representing a hypothetical gameID, as used on nba.com.
 '''
 def gameID(season, num, playoffs):
     if playoffs:
@@ -68,6 +79,11 @@ def gameID(season, num, playoffs):
 
 '''
 Checks that the 3-digit number can represent an NBA playoff game.
+@param num: Refer to playoff gameID format for the gameID method.
+@return: For the units digit, there can only be 7 games in a series.
+For the tens digit, there are 8 series in the first round, 4 in the second, 2 in the third, and 1 in the fourth.
+For the hundreds digit, there are 4 rounds in the playoffs.
+Return true if and only if all 3 of the above are satisfied by the digits of num.
 '''
 def validPlayoffID(num):
     gameNum = num % 10
@@ -85,7 +101,15 @@ def validPlayoffID(num):
     else:
         return False
 
-#pbp may NOT start with a foul that sends a hacking target to the line!!!
+'''
+Search through a play-by-play log for instances of hacking.
+@param pbp: Play-by-play log. May NOT start with a foul that sends a hacking target to the line!!!
+@param season: If season = n, we check stats from the [2000 + n] - [2001 + n] season.
+@param num: Refer to playoff gameID format for the gameID method.
+@param playoffs: If true, the game is a playoff game. By default, the game is a regular season game.
+@return: A list of dictionaries, each with keys = hack_keys. These represent instances of hacking and
+potentially vital information about them.
+'''
 def parse_pbp(pbp, season, num, playoffs = False):
     hacking = False
     margin = 0
@@ -99,7 +123,6 @@ def parse_pbp(pbp, season, num, playoffs = False):
     all_hacks = []
     pbp = list(pbp.itertuples())
     for play in pbp:
-        #pdb.set_trace()
         desc = play[8] if not play[10] else play[10]
         if play[12]:
             margin = play[12] #this variable is from home team's POV
@@ -130,7 +153,6 @@ def parse_pbp(pbp, season, num, playoffs = False):
                 event['StartQ'] = play[5]
                 event['StartTime'] = play[7]
                 event['StartMargin'] = int(margin) * event['Location']
-                #event['JumpOnBack'] = 1 if (prev[3] == 3 or pbp.ix[index - 2][2] == 3)else 0 #This usually occurs on FT attempts
         if hacking:
             #update parameters for made FTs
             if utils.ft_made(play, event['Opp']):
@@ -186,6 +208,12 @@ def parse_pbp(pbp, season, num, playoffs = False):
             event['Win'] = 0
     return all_hacks
 
+'''
+Retrieve all instance of hacking from a given game.
+@param season: If season = n, we check stats from the [2000 + n] - [2001 + n] season.
+@param num: Refer to playoff gameID format for the gameID method.
+@param playoffs: If true, the game is a playoff game. By default, the game is a regular season game.
+'''
 def find_hacks(season, num, playoffs = False):
     if playoffs:
         path = '20{0}-{1}playoffs/004{2}{3}.csv'.format(str(season), str(season + 1), str(season), str(num).rjust(5, '0'))
@@ -195,6 +223,11 @@ def find_hacks(season, num, playoffs = False):
     pbp = pbp.fillna(value = "")
     return parse_pbp(pbp, season, num, playoffs)
 
+'''
+Retrieve all instance of hacking from a given season.
+@param season: If season = n, we check stats from the [2000 + n] - [2001 + n] season.
+@param playoffs: If true, search playoff games only. By default, search regular season games only.
+'''
 def collect_hacks(season, playoffs = False):
     master = open('hack_master.csv', 'a')
     fp = csv.DictWriter(master, hack_keys)
@@ -211,7 +244,7 @@ def collect_hacks(season, playoffs = False):
                 hacks = find_hacks(season, i, True)
                 if hacks:
                     fp.writerows(hacks)
-    master.close() #ALWAYS close a file after you're done writing to it!!!
+    master.close()
 
 '''
 THOMPSON'S SHOT CHART

@@ -29,7 +29,7 @@ vulnerable <- allPlayers[allPlayers$FT_RATE15 > 0,]
 vulnerable <- vulnerable[vulnerable$FT_RATE15 < 0.7,]
 ```
 
-Players who have been targeted at least 10 times over the last 3 require our attention. "targets" should be an array of length 12.
+Players who have been targeted at least 10 times over the last 3 seasons require our attention. "targets" should be an array of length 12.
 
 ```{r}
 targets <- hackedPlayers[which(hackedPlayers >= 10)]
