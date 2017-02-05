@@ -85,6 +85,16 @@ def turnover(play, team):
     return play[3] == 5 and play[19] == team 
 
 '''
+Whether or not the datatuple is describing a team foul for the given team.
+Team fouls include personal, loose ball, and flagrant fouls, but not offensive or technical fouls.
+@param play: Description of play in pd.DataFrame form.
+@param team: A 3-letter string indicating the team.
+@return: True if the team has been charged with a team foul. 
+'''
+def team_foul(play, team):
+    return play[3] == 6 and play[19] == team and (play[8] + play[10]).lower().find(" off") == -1 and (play[8] + play[10]).find("T.Foul") == -1
+
+'''
 Whether or not the datatuple is describing an offensive rebound for the given team.
 @param prev: Description of play immediately before target play.
 @param play: Description of target play in pd.DataFrame form.
@@ -228,3 +238,4 @@ def get_date(gameID, season, playoffs = False):
     schedule = pd.DataFrame.from_csv('games{0}{1}{2}.csv'.format(str(season), str(season+1), seasontype))
     game = schedule[schedule.GAME_ID == gameID]
     return pd.to_datetime(game.GAME_DATE.unique()[0])
+
