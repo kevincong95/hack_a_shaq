@@ -7,6 +7,15 @@ import pdb
 from datetime import datetime as dt
 
 '''
+Return the first and last name of the player with the given playerID.
+@return: "[first_name] [last_name]"
+'''
+def player_name(playerID):
+    allplayers = pd.DataFrame.from_csv('all_players.csv')
+    profile = allplayers[allplayers['PERSON_ID'] == playerID]
+    return profile['DISPLAY_FIRST_LAST'].values[0]
+
+'''
 Whether or not the datatuple is describing a made free throw for the given team.
 @param play: Description of play in pd.DataFrame form.
 @param team: A 3-letter string indicating the team.
@@ -85,6 +94,15 @@ def turnover(play, team):
     return play[3] == 5 and play[19] == team 
 
 '''
+Whether or not the datatuple is describing a personal foul against a player on the given team.
+@param play: Description of play in pd.DataFrame form.
+@param team: A 3-letter string indicating the team.
+@return: True if a player on the team has committed a personal foul. 
+'''
+def personal_foul(play, team):
+    return play[3] == 6 and play[19] == team and (play[8] + play[10]).find("T.Foul") == -1
+
+'''
 Whether or not the datatuple is describing a team foul for the given team.
 Team fouls include personal, loose ball, and flagrant fouls, but not offensive or technical fouls.
 @param play: Description of play in pd.DataFrame form.
@@ -92,7 +110,18 @@ Team fouls include personal, loose ball, and flagrant fouls, but not offensive o
 @return: True if the team has been charged with a team foul. 
 '''
 def team_foul(play, team):
-    return play[3] == 6 and play[19] == team and (play[8] + play[10]).lower().find(" off") == -1 and (play[8] + play[10]).find("T.Foul") == -1
+    return personal_foul(play, team) and (play[8] + play[10]).lower().find(" off") == -1
+
+'''
+Whether or not the datatuple is describing a personal take foul for the given team.
+A personal take foul is a team foul labelled "personal take" and not committed in the
+last minute of the fourth quarter.
+@param play: Description of play in pd.DataFrame form.
+@param team: A 3-letter string indicating the team.
+@return: True if the team has been charged with a team foul. 
+'''
+def personal_take(play, team):
+    return personal_foul(play, team) and (play[8] + play[10]).lower().find('take') > -1 and (clock_to_secs(play[7]) > 60 or play[5] < 4)
 
 '''
 Whether or not the datatuple is describing an offensive rebound for the given team.

@@ -5,7 +5,7 @@ import os.path
 import pandas as pd
 import nbawebstats as nbaws
 from time import sleep
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 import play_utils as utils
 import pdb
 
@@ -214,14 +214,7 @@ def collect_hacks(season, playoffs = False):
 	master.close() #ALWAYS close a file after you're done writing to it!!!
 
 def penalty_time(gameID, team, quarter):
-	season = int(gameID[1:3])
-	if gameID[0] == '4':
-		path = '20{0}-{1}playoffs/00{2}.csv'.format(str(season), str(season + 1), gameID)
-	elif gameID[0] == '2':
-		path = '20{0}-{1}reg/00{2}.csv'.format(str(season), str(season + 1), gameID)
-	pbp = pd.DataFrame.from_csv(path)
-	pbp = pbp.fillna(value = "")
-	pbp = list(pbp.itertuples())
+	pbp = load_pbp(gameID)
 	index = 0
 	play = pbp[index]
 	while play[5] != quarter:
@@ -239,6 +232,66 @@ def penalty_time(gameID, team, quarter):
 			return 0
 		index += 1
 	return utils.clock_to_secs(play[7])
+
+'''
+For the given quarter of the given gameID, return a Counter of ID's of every
+player on the given team who committed a personal foul in that quarter.
+@param pre: If true, include fouls occurring before penalty situation (first 4 in a quarter, 
+	or all in first 10 minutes plus first in last 2 minutes, whichever is fewer)
+@param post: If true, include fouls occurring after penalty situation.
+If both pre and post are False, return the empty Counter.
+@param take: If true, include fouls labelled as "personal take", excluding last minute of 4th quarter.
+@param incidental: If true, include fouls not labelled as "personal take" and end-game fouls.
+If both take and incidental are False, return the empty Counter.
+@return: A counter of player ID's and how many fouls they committed.
+'''
+def whos_fouling(gameID, team, quarter, pre = True, post = True, take = True, incidental = True):
+	pbp = load_pbp(gameID)
+	index = 0
+	play = pbp[index]
+	while play[5] != quarter:
+		index += 1
+		play = pbp[index]
+	fouls = Counter()
+	bonus_time = penalty_time(gameID, team, quarter)
+	while play[5] == quarter and index < len(pbp):
+		play = pbp[index]
+		if utils.personal_foul(play, team):
+			if valid_foul(play, team, bonus_time, pre, post, take, incidental):
+				fouls.update([play[14]])
+		index += 1
+	return fouls
+
+'''
+Whether or not the foul satisfies the given conditions for committing a foul.
+@param bonus: Time in quarter where team entered penalty.
+@param pre: Whether or not we consider pre-penalty fouls.
+@param post: Whether or not we consider post-penalty fouls.
+@param take: Whether or not we consider fouls labelled "personal take", excluding last minute of 4th quarter.
+@param incidental: Whether or not we consider fouls not labelled as "personal take" and end-game fouls.
+@return: Whether or not the play is a foul satisfying conditions we wish to consider.
+'''
+def valid_foul(play, team, bonus, pre, post, take, incidental):
+	if not utils.personal_foul(play, team):
+		return False
+	isPre = pre and (play[8] + play[10]).find("PN") == -1 and utils.clock_to_secs(play[7]) >= bonus
+	isPost = post and (play[8] + play[10]).find("PN") > -1 and utils.clock_to_secs(play[7]) <= bonus
+	isTake = take and utils.personal_take(play, team)
+	isIndicental = incidental and not utils.personal_take(play, team)
+	return (isPre or isPost) and (isTake or isIndicental)
+
+'''
+Loads play-by-play log for the given gameID.
+@return: List of plays in tuple form.
+'''
+def load_pbp(gameID):
+	gameID = str(gameID)
+	season = int(gameID[1:3])
+	if gameID[0] == '4':
+		path = '20{0}-{1}playoffs/00{2}.csv'.format(str(season), str(season + 1), gameID)
+	elif gameID[0] == '2':
+		path = '20{0}-{1}reg/00{2}.csv'.format(str(season), str(season + 1), gameID)
+	return pd.read_table(path, sep = ",")
 
 
 '''
@@ -262,6 +315,6 @@ TeamID=0&VsConference=&VsDivision=&mode=Advanced&showDetails=0&showShots=1&showZ
 '''
 PLAY-BY-PLAY DATA HERE:
 http://stats.nba.com/stats/playbyplayv2?EndPeriod=10&EndRange=55800&
-GameID=0021501230&RangeType=2&Season=2015-16&SeasonType=Regular+Season&StartPeriod=1&StartRange=0
+GameID={gameID}&RangeType=2&Season={season}&SeasonType=Regular+Season&StartPeriod=1&StartRange=0
 PARAMS: GameID, Season, SeasonType
 '''
